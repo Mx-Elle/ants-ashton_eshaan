@@ -1,8 +1,10 @@
-from multiprocessing import Queue
 from random import choice
 from board import Entity, neighbors
 import numpy as np
 import numpy.typing as npt
+
+
+AntMove = tuple[tuple[int, int], tuple[int, int]]
 
 
 def valid_neighbors(
@@ -37,8 +39,8 @@ class RandomBot:
         self,
         vision: set[tuple[tuple[int, int], Entity]],
         stored_food: int,
-        move_queue: Queue,
-    ):
+    ) -> set[AntMove]:
+        out = set()
         my_ants = {coord for coord, kind in vision if kind == Entity.FRIENDLY_ANT}
         my_hills = {coord for coord, kind in vision if kind == Entity.FRIENDLY_HILL}
         claimed_destinations = my_hills
@@ -53,4 +55,5 @@ class RandomBot:
                 continue
             dest = choice(valid)
             claimed_destinations.add(dest)
-            move_queue.put((ant, dest))
+            out.add((ant, dest))
+        return out
