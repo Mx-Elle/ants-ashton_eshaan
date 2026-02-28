@@ -13,7 +13,9 @@ from tqdm import trange
 from board import Board, Entity, cells_within_distance, generate_board
 from dataclasses import dataclass
 
+from clever_player import CleverBot
 from random_player import RandomBot
+from clever_player2 import CleverBot2
 
 AntMove = tuple[tuple[int, int], tuple[int, int]]
 
@@ -61,7 +63,7 @@ class GameSpecification:
     vision_radius: int = 8
     battle_radius: int = 3
     max_turns: int = 1000
-    time_per_turn: float = 0.3
+    time_per_turn: float = 1
 
 
 def play_game(
@@ -301,7 +303,7 @@ def harvest(board: Board, collect_radius: int, food: dict[int, int]) -> None:
 def main():
     b = generate_board(60, 60, hills_per_player=3)
     spec = GameSpecification(b)
-    play_game(spec, RandomBot, RandomBot)
+    play_game(spec, CleverBot, RandomBot)
 
 
 if __name__ == "__main__":

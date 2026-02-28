@@ -197,15 +197,11 @@ class CleverBot(RandomBot):
         threatened_hills = {h for h in my_hills if self._hill_is_threatened(h, enemy_ants)}
 
         n_ants = len(my_ants)
-        n_defenders_needed = len(threatened_hills) 
+        n_defenders_needed = len(threatened_hills) *3
         n_harvesters_needed = len(dead_end_food)
         spare = n_ants - max(n_defenders_needed, 2) - n_harvesters_needed
-        n_attackers = max(0, spare) 
+        n_attackers = max(0, spare) // 2
 
-        if n_ants > 200:
-            n_defenders_needed = 0
-            n_harvesters_needed = 0
-            n_attackers = n_ants 
 
         ants_sorted = sorted(my_ants)
         assigned: set[tuple[int, int]] = set()
