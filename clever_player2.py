@@ -38,7 +38,7 @@ def toroidal_step(
 
 
 
-class CleverBot(RandomBot):
+class CleverBot2(RandomBot):
 
 
     _EXPLORE_DIRS: list[tuple[int, int]] = [
