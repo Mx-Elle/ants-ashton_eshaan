@@ -1,5 +1,4 @@
 from random import choice
-import logging
 
 import numpy as np
 import numpy.typing as npt
@@ -8,9 +7,6 @@ from board import Entity, neighbors, toroidal_distance_2
 from random_player import RandomBot, valid_neighbors
 
 AntMove = tuple[tuple[int, int], tuple[int, int]]
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 
@@ -64,15 +60,10 @@ class CleverBot2(RandomBot):
         self.__name = "CleverBot"
 
         self.dead_ends: frozenset[tuple[int, int]] = self._compute_dead_ends()
-        logger.info(f"Dead-end/corridor cells: {len(self.dead_ends)}")
 
     @property
     def name(self) -> str:
         return self.__name
-
-    # ------------------------------------------------------------------
-    # One-time map analysis
-    # ------------------------------------------------------------------
 
     def _compute_dead_ends(self) -> frozenset[tuple[int, int]]:
         shape = self.walls.shape
@@ -109,6 +100,18 @@ class CleverBot2(RandomBot):
         lookahead_r2 = (self.battle_radius + 2) ** 2
         return any(self._dist2(e, hill) <= lookahead_r2 for e in enemy_ants)
 
+    def _enemies_threatening_hills(
+        self,
+        my_hills: set[tuple[int, int]],
+        enemy_ants: set[tuple[int, int]],
+    ) -> set[tuple[int, int]]:
+        lookahead_r2 = (self.battle_radius + 2) ** 2
+        return {
+            e
+            for e in enemy_ants
+            if any(self._dist2(e, hill) <= lookahead_r2 for hill in my_hills)
+        }
+
     def _explore_target(self, ant: tuple[int, int], index: int) -> tuple[int, int]:
         shape = self.walls.shape
         dr, dc = self._EXPLORE_DIRS[index % len(self._EXPLORE_DIRS)]
@@ -124,15 +127,20 @@ class CleverBot2(RandomBot):
         claimed_dests: set[tuple[int, int]],
         avoid: set[tuple[int, int]] | None = None,
     ) -> tuple[int, int]:
-        if target is not None:
-            step = toroidal_step(ant, target, self.walls, forbidden=avoid)
-            if step is not None and step not in claimed_dests:
-                return step
-
         options = [
             v for v in valid_neighbors(*ant, self.walls)
             if v not in claimed_dests and (avoid is None or v not in avoid)
         ]
+
+        if target is not None:
+            step = toroidal_step(ant, target, self.walls, forbidden=avoid)
+            if step is not None and step not in claimed_dests:
+                return step
+            if options:
+                best_d = min(self._dist2(v, target) for v in options)
+                best_steps = [v for v in options if self._dist2(v, target) == best_d]
+                return choice(best_steps)
+
         if options:
             return choice(options)
 
@@ -195,6 +203,7 @@ class CleverBot2(RandomBot):
         open_food     = safe_food - dead_end_food
 
         threatened_hills = {h for h in my_hills if self._hill_is_threatened(h, enemy_ants)}
+        threatening_enemies = self._enemies_threatening_hills(my_hills, enemy_ants)
 
         n_ants = len(my_ants)
         n_defenders_needed = len(threatened_hills) *3
@@ -262,7 +271,9 @@ class CleverBot2(RandomBot):
 
         # Defenders
         for ant in sorted(defender_set):
-            nearest_threat = self._nearest(ant, threatened_hills)
+            nearest_threat = self._nearest(ant, threatening_enemies)
+            if nearest_threat is None:
+                nearest_threat = self._nearest(ant, threatened_hills)
             dest = self._combat_aware_dest(
                 ant, nearest_threat, my_ants, enemy_ants, my_hills, claimed_dests
             )
@@ -273,7 +284,7 @@ class CleverBot2(RandomBot):
             dest = self._pick_move(ant, food_target, claimed_dests)
             commit(ant, dest)
 
-        # Attackers (avoid dead-ends)
+        # Attackers (avoid deadends)
         for ant in sorted(attacker_set):
             dest = self._combat_aware_dest(
                 ant, attack_target, my_ants, enemy_ants, my_hills, claimed_dests,
@@ -282,8 +293,13 @@ class CleverBot2(RandomBot):
             commit(ant, dest)
 
         # Gatherers / Explorers
+        open_food_unclaimed = set(open_food)
         for idx, ant in enumerate(remaining):
-            target = self._nearest(ant, open_food)
+            target = self._nearest(ant, open_food_unclaimed)
+            if target is not None:
+                open_food_unclaimed.discard(target)
+            elif open_food:
+                target = self._nearest(ant, open_food)
             if target is None and enemy_hills:
                 target = self._nearest(ant, enemy_hills)
             if target is None:
